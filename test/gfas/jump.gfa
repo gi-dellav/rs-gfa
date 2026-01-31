@@ -1,0 +1,6 @@
+H	VN:Z:1.0
+S	seg1	CGATCGAT
+S	seg2	GCTAGCTA
+S	seg3	TTCGATTC
+L	seg1	+	seg2	+	0M
+J	seg2	+	seg3	+	1000	*

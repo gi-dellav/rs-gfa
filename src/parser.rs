@@ -18,6 +18,7 @@ pub struct GFAParserBuilder {
     pub containments: bool,
     pub paths: bool,
     pub walks: bool,
+    pub jumps: bool,
     pub tolerance: ParserTolerance,
 }
 
@@ -30,6 +31,7 @@ impl GFAParserBuilder {
             containments: false,
             paths: false,
             walks: false,
+            jumps: false,
             tolerance: Default::default(),
         }
     }
@@ -42,6 +44,7 @@ impl GFAParserBuilder {
             containments: true,
             paths: true,
             walks: true,
+            jumps: true,
             tolerance: Default::default(),
         }
     }
@@ -63,6 +66,11 @@ impl GFAParserBuilder {
 
     pub fn walks(&mut self, include: bool) -> &mut Self {
         self.walks = include;
+        self
+    }
+
+    pub fn jumps(&mut self, include: bool) -> &mut Self {
+        self.jumps = include;
         self
     }
 
@@ -93,6 +101,7 @@ impl GFAParserBuilder {
             containments: self.containments,
             paths: self.paths,
             walks: self.walks,
+            jumps: self.jumps,
             tolerance: self.tolerance,
             _optional_fields: std::marker::PhantomData,
             _segment_names: std::marker::PhantomData,
@@ -115,6 +124,7 @@ pub struct GFAParser<N: SegmentId, T: OptFields> {
     containments: bool,
     paths: bool,
     walks: bool,
+    jumps: bool,
     tolerance: ParserTolerance,
     _optional_fields: std::marker::PhantomData<T>,
     _segment_names: std::marker::PhantomData<N>,
@@ -143,6 +153,7 @@ impl<N: SegmentId, T: OptFields> GFAParser<N, T> {
             b'P' => !self.paths,
             b'C' => !self.containments,
             b'W' => !self.walks,
+            b'J' => !self.jumps,
             _ => true,
         }
     }
@@ -173,6 +184,7 @@ impl<N: SegmentId, T: OptFields> GFAParser<N, T> {
             b"C" => Containment::parse_line(fields).map(Containment::wrap),
             b"P" => Path::parse_line(fields).map(Path::wrap),
             b"W" => Walk::parse_line(fields).map(Walk::wrap),
+            b"J" => Jump::parse_line(fields).map(Jump::wrap),
             _ => return Err(ParseError::UnknownLineType),
         }
         .map_err(invalid_line)?;
@@ -202,6 +214,7 @@ impl<N: SegmentId, T: OptFields> GFAParser<N, T> {
             b"L" => Link::parse_line(fields).map(Link::wrap),
             b"C" => Containment::parse_line(fields).map(Containment::wrap),
             b"P" => Path::parse_line(fields).map(Path::wrap),
+            b"J" => Jump::parse_line(fields).map(Jump::wrap),
             _ => return Err(ParseError::UnknownLineType),
         }
         .map_err(invalid_line)?;
@@ -277,6 +290,11 @@ pub const fn type_path() -> u8 {
 #[inline]
 pub const fn type_containment() -> u8 {
     b'C'
+}
+
+#[inline]
+pub const fn type_jump() -> u8 {
+    b'J'
 }
 
 #[inline]
@@ -491,6 +509,43 @@ impl<N: SegmentId, T: OptFields> Path<N, T> {
         let optional = T::parse(input);
 
         Ok(Path::new(path_name, segment_names, overlaps, optional))
+    }
+}
+
+impl<N: SegmentId, T: OptFields> Jump<N, T> {
+    #[inline]
+    fn wrap(self) -> Line<N, T> {
+        Line::Jump(self)
+    }
+
+    #[inline]
+    fn parse_line<I>(mut input: I) -> GFAFieldResult<Self>
+    where
+        I: Iterator,
+        I::Item: AsRef<[u8]>,
+    {
+        let from_segment = N::parse_next(&mut input)?;
+        let from_orient = parse_orientation(&mut input)?;
+        let to_segment = N::parse_next(&mut input)?;
+        let to_orient = parse_orientation(&mut input)?;
+
+        let distance_str = next_field(&mut input)?;
+        let distance = if distance_str.as_ref() == b"*" {
+            None
+        } else {
+            let distance = distance_str.as_ref().to_str()?.parse::<i64>()?;
+            Some(distance)
+        };
+
+        let optional = T::parse(input);
+        Ok(Jump {
+            from_segment,
+            from_orient,
+            to_segment,
+            to_orient,
+            distance,
+            optional,
+        })
     }
 }
 

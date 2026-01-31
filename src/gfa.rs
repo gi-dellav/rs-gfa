@@ -36,6 +36,7 @@ pub struct GFA<N, T: OptFields> {
     pub containments: Vec<Containment<N, T>>,
     pub paths: Vec<Path<N, T>>,
     pub walks: Vec<Walk<N, T>>,
+    pub jumps: Vec<Jump<N, T>>,
 }
 
 impl<N: SegmentId, T: OptFields> Display for GFA<N, T> {
@@ -80,6 +81,14 @@ impl<N: SegmentId, T: OptFields> Display for GFA<N, T> {
             ));
         }
 
+        for jump in self.jumps.iter() {
+            write!(f, "{}\n", jump).expect(&format!(
+                "Error writing jump from {} to {} to GFA stream",
+                jump.from_segment.display(),
+                jump.to_segment.display()
+            ));
+        }
+
         Ok(())
     }
 }
@@ -93,6 +102,7 @@ pub enum Line<N, T: OptFields> {
     Containment(Containment<N, T>),
     Path(Path<N, T>),
     Walk(Walk<N, T>),
+    Jump(Jump<N, T>),
 }
 
 macro_rules! some_line_fn {
@@ -115,6 +125,7 @@ some_line_fn!(some_link, Link<N, T>, Line::Link);
 some_line_fn!(some_containment, Containment<N, T>, Line::Containment);
 some_line_fn!(some_path, Path<N, T>, Line::Path);
 some_line_fn!(some_walk, Walk<N, T>, Line::Walk);
+some_line_fn!(some_jump, Jump<N, T>, Line::Jump);
 
 macro_rules! some_line_ref_fn {
     ($name:ident, $tgt:ty, $variant:path) => {
@@ -136,6 +147,7 @@ some_line_ref_fn!(some_link, Link<N, T>, LineRef::Link);
 some_line_ref_fn!(some_containment, Containment<N, T>, LineRef::Containment);
 some_line_ref_fn!(some_path, Path<N, T>, LineRef::Path);
 some_line_ref_fn!(some_walk, Walk<N, T>, LineRef::Walk);
+some_line_ref_fn!(some_jump, Jump<N, T>, LineRef::Jump);
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum LineRef<'a, N, T: OptFields> {
@@ -145,6 +157,7 @@ pub enum LineRef<'a, N, T: OptFields> {
     Containment(&'a Containment<N, T>),
     Path(&'a Path<N, T>),
     Walk(&'a Walk<N, T>),
+    Jump(&'a Jump<N, T>),
 }
 
 impl<N, T: OptFields> GFA<N, T> {
@@ -162,12 +175,13 @@ impl<N, T: OptFields> GFA<N, T> {
             Containment(s) => self.containments.push(s),
             Path(s) => self.paths.push(s),
             Walk(s) => self.walks.push(s),
+            Jump(s) => self.jumps.push(s),
         }
     }
 
     /// Consume a GFA object to produce an iterator over all the lines
     /// contained within. The iterator first produces all segments, then
-    /// links, then containments, and finally paths.
+    /// links, then containments, paths, walks, and finally jumps.
     pub fn lines_into_iter(self) -> impl Iterator<Item = Line<N, T>> {
         use Line::*;
         let segs = self.segments.into_iter().map(Segment);
@@ -175,8 +189,13 @@ impl<N, T: OptFields> GFA<N, T> {
         let conts = self.containments.into_iter().map(Containment);
         let paths = self.paths.into_iter().map(Path);
         let walks = self.walks.into_iter().map(Walk);
+        let jumps = self.jumps.into_iter().map(Jump);
 
-        segs.chain(links).chain(conts).chain(paths).chain(walks)
+        segs.chain(links)
+            .chain(conts)
+            .chain(paths)
+            .chain(walks)
+            .chain(jumps)
     }
 
     /// Return an iterator over references to the lines in the GFA
@@ -187,8 +206,13 @@ impl<N, T: OptFields> GFA<N, T> {
         let conts = self.containments.iter().map(Containment);
         let paths = self.paths.iter().map(Path);
         let walks = self.walks.iter().map(Walk);
+        let jumps = self.jumps.iter().map(Jump);
 
-        segs.chain(links).chain(conts).chain(paths).chain(walks)
+        segs.chain(links)
+            .chain(conts)
+            .chain(paths)
+            .chain(walks)
+            .chain(jumps)
     }
 }
 
@@ -287,6 +311,26 @@ impl<T: OptFields> Link<Vec<u8>, T> {
     }
 }
 
+impl<T: OptFields> Jump<Vec<u8>, T> {
+    #[inline]
+    pub fn new(
+        from_segment: &[u8],
+        from_orient: Orientation,
+        to_segment: &[u8],
+        to_orient: Orientation,
+        distance: Option<i64>,
+    ) -> Jump<Vec<u8>, T> {
+        Jump {
+            from_segment: from_segment.into(),
+            from_orient,
+            to_segment: to_segment.into(),
+            to_orient,
+            distance,
+            optional: Default::default(),
+        }
+    }
+}
+
 impl<N: SegmentId, U: OptFields> Display for Link<N, U> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
@@ -304,6 +348,26 @@ impl<N: SegmentId, U: OptFields> Display for Link<N, U> {
     }
 }
 
+impl<N: SegmentId, T: OptFields> Display for Jump<N, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "J\t{}\t{}\t{}\t{}\t{}",
+            self.from_segment.display(),
+            self.from_orient,
+            self.to_segment.display(),
+            self.to_orient,
+            match self.distance {
+                Some(d) => d.to_string(),
+                None => "*".to_string(),
+            }
+        )
+        .expect("Error writing jump to stream");
+        write_optional_fields(&self.optional, f);
+        Ok(())
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct Containment<N, T: OptFields> {
@@ -313,6 +377,18 @@ pub struct Containment<N, T: OptFields> {
     pub contained_orient: Orientation,
     pub pos: usize,
     pub overlap: Vec<u8>,
+    pub optional: T,
+}
+
+/// Jump lines represent connections between segments across gaps
+#[derive(Default, Debug, Clone, PartialEq, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+pub struct Jump<N, T: OptFields> {
+    pub from_segment: N,
+    pub from_orient: Orientation,
+    pub to_segment: N,
+    pub to_orient: Orientation,
+    pub distance: Option<i64>,
     pub optional: T,
 }
 
@@ -543,6 +619,19 @@ impl<N, T: OptFields> Containment<N, T> {
             contained_orient: self.contained_orient,
             pos: self.pos,
             overlap: self.overlap.clone(),
+            optional: self.optional.clone(),
+        }
+    }
+}
+
+impl<N, T: OptFields> Jump<N, T> {
+    pub(crate) fn nameless_clone<M: Default>(&self) -> Jump<M, T> {
+        Jump {
+            from_segment: Default::default(),
+            from_orient: self.from_orient,
+            to_segment: Default::default(),
+            to_orient: self.to_orient,
+            distance: self.distance,
             optional: self.optional.clone(),
         }
     }

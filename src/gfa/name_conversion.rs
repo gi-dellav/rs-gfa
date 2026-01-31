@@ -1,5 +1,5 @@
 use crate::{
-    gfa::{Containment, Link, Path, Segment, Walk, GFA},
+    gfa::{Containment, Jump, Link, Path, Segment, Walk, GFA},
     optfields::*,
 };
 
@@ -50,6 +50,14 @@ fn hash_gfa<T: OptFields>(gfa: &GFA<Vec<u8>, T>) -> u64 {
         walk.seq_start.hash(&mut hasher);
         walk.seq_end.hash(&mut hasher);
         walk.segment_path.hash(&mut hasher);
+    }
+
+    for jump in gfa.jumps.iter() {
+        jump.from_segment.hash(&mut hasher);
+        jump.from_orient.hash(&mut hasher);
+        jump.to_segment.hash(&mut hasher);
+        jump.to_orient.hash(&mut hasher);
+        jump.distance.hash(&mut hasher);
     }
 
     hasher.finish()
@@ -349,6 +357,16 @@ impl NameMap {
             walks.push(new_walk);
         }
 
+        let mut jumps = Vec::with_capacity(gfa.jumps.len());
+        for jump in gfa.jumps.iter() {
+            let from_name = self.map_name(&jump.from_segment)?;
+            let to_name = self.map_name(&jump.to_segment)?;
+            let mut new_jump: Jump<usize, T> = jump.nameless_clone();
+            new_jump.from_segment = from_name;
+            new_jump.to_segment = to_name;
+            jumps.push(new_jump);
+        }
+
         Some(GFA {
             header: gfa.header.clone(),
             segments,
@@ -356,6 +374,7 @@ impl NameMap {
             containments,
             paths,
             walks,
+            jumps,
         })
     }
 
@@ -405,6 +424,16 @@ impl NameMap {
             walks.push(new_walk);
         }
 
+        let mut jumps = Vec::with_capacity(gfa.jumps.len());
+        for jump in gfa.jumps.iter() {
+            let from_name = self.inverse_map_name(jump.from_segment)?;
+            let to_name = self.inverse_map_name(jump.to_segment)?;
+            let mut new_jump: Jump<Vec<u8>, T> = jump.nameless_clone();
+            new_jump.from_segment = Vec::from_slice(from_name);
+            new_jump.to_segment = Vec::from_slice(to_name);
+            jumps.push(new_jump);
+        }
+
         Some(GFA {
             header: gfa.header.clone(),
             segments,
@@ -412,6 +441,7 @@ impl NameMap {
             containments,
             paths,
             walks,
+            jumps,
         })
     }
 
@@ -438,7 +468,7 @@ impl NameMap {
         }
         for link in gfa.links.iter() {
             get_ix(link.from_segment.as_ref());
-            get_ix(link.from_segment.as_ref());
+            get_ix(link.to_segment.as_ref());
         }
         for cont in gfa.containments.iter() {
             get_ix(cont.container_name.as_ref());
@@ -449,6 +479,11 @@ impl NameMap {
             for (seg, _) in walk.segment_path.iter() {
                 get_ix(seg.as_ref());
             }
+        }
+
+        for jump in gfa.jumps.iter() {
+            get_ix(jump.from_segment.as_ref());
+            get_ix(jump.to_segment.as_ref());
         }
 
         NameMap {
