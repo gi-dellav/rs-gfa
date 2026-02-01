@@ -5,17 +5,12 @@ use bstr::ByteSlice;
 pub type GFAFieldResult<T> = Result<T, ParseFieldError>;
 pub type GFAResult<T> = Result<T, ParseError>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum ParserTolerance {
     IgnoreAll,
+    #[default]
     Safe,
     Pedantic,
-}
-
-impl Default for ParserTolerance {
-    fn default() -> Self {
-        Self::Safe
-    }
 }
 
 #[derive(Debug, Clone)]

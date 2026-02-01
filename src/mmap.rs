@@ -48,9 +48,7 @@ impl<'a> Iterator for SegmentIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Ok(line) = self.mmap.next_line() {
             if let Some(b'S') = line.first() {
-                if let Some(Line::Segment(s)) =
-                    self.parser.parse_gfa_line(line).ok()
-                {
+                if let Ok(Line::Segment(s)) = self.parser.parse_gfa_line(line) {
                     return Some(s);
                 }
             }
@@ -72,9 +70,7 @@ impl<'a> Iterator for LinkIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Ok(line) = self.mmap.next_line() {
             if let Some(b'S') = line.first() {
-                if let Some(Line::Link(s)) =
-                    self.parser.parse_gfa_line(line).ok()
-                {
+                if let Ok(Line::Link(s)) = self.parser.parse_gfa_line(line) {
                     return Some(s);
                 }
             }
@@ -96,9 +92,7 @@ impl<'a> Iterator for PathIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Ok(line) = self.mmap.next_line() {
             if let Some(b'S') = line.first() {
-                if let Some(Line::Path(s)) =
-                    self.parser.parse_gfa_line(line).ok()
-                {
+                if let Ok(Line::Path(s)) = self.parser.parse_gfa_line(line) {
                     return Some(s);
                 }
             }

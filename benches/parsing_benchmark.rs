@@ -20,7 +20,9 @@ fn load_lines(path: &PathBuf) -> io::Result<Vec<Vec<u8>>> {
 
 fn parse_lines<T: OptFields>(input: &[Vec<u8>]) -> GFA<Vec<u8>, T> {
     let parser: GFAParser<Vec<u8>, T> = GFAParser::new();
-    parser.parse_lines(input.iter().map(|v| v.as_slice())).unwrap()
+    parser
+        .parse_lines(input.iter().map(|v| v.as_slice()))
+        .unwrap()
 }
 
 fn parse_lines_noopt(input: &[Vec<u8>]) -> GFA<Vec<u8>, ()> {
@@ -33,7 +35,9 @@ fn parse_lines_withopt(input: &[Vec<u8>]) -> GFA<Vec<u8>, OptionalFields> {
 
 fn parse_lines_usize<T: OptFields>(input: &[Vec<u8>]) -> GFA<usize, T> {
     let parser: GFAParser<usize, T> = GFAParser::new();
-    parser.parse_lines(input.iter().map(|v| v.as_slice())).unwrap()
+    parser
+        .parse_lines(input.iter().map(|v| v.as_slice()))
+        .unwrap()
 }
 
 fn parse_lines_usize_noopt(input: &[Vec<u8>]) -> GFA<usize, ()> {

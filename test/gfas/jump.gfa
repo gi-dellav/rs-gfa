@@ -1,6 +1,9 @@
-H	VN:Z:1.0
-S	seg1	CGATCGAT
-S	seg2	GCTAGCTA
-S	seg3	TTCGATTC
-L	seg1	+	seg2	+	0M
-J	seg2	+	seg3	+	1000	*
+H	VN:Z:1.1
+S	s11	ACCTT
+S	s12	TC
+S	s13	GATT
+L	s11	+	s12	-	0M
+L	s12	-	s13	+	0M
+L	s11	+	s13	+	0M
+J	s11	+	s13	+	100
+W	NA12878	1	chr1	0	11	>s11<s12>s13

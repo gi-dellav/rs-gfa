@@ -89,7 +89,7 @@ impl std::str::FromStr for CIGAROp {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.as_bytes()
-            .get(0)
+            .first()
             .cloned()
             .and_then(CIGAROp::from_u8_char)
             .ok_or("Could not parse CIGAR operation")
@@ -242,7 +242,7 @@ impl CIGAR {
     /// M, D, D]
     pub fn iter_single(&self) -> impl Iterator<Item = CIGAROp> + '_ {
         self.0.iter().copied().flat_map(|pair| {
-            std::iter::repeat(pair.op()).take(pair.len() as usize)
+            std::iter::repeat_n(pair.op(), pair.len() as usize)
         })
     }
 

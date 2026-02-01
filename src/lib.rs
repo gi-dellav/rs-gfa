@@ -4,3 +4,6 @@ pub mod gfa;
 pub mod mmap;
 pub mod optfields;
 pub mod parser;
+
+#[cfg(test)]
+mod tests;
