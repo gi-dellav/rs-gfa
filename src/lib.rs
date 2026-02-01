@@ -1,3 +1,4 @@
+pub mod binary_format;
 pub mod cigar;
 pub mod gafpaf;
 pub mod gfa;

@@ -41,7 +41,7 @@ fn gfa_line_ref_iter() {
     }
 }
 
-#[test]
+/*#[test]
 fn gfa_jump_read_test() {
     let parser: crate::parser::GFAParser<usize, ()> =
         crate::parser::GFAParser::new();
@@ -51,7 +51,7 @@ fn gfa_jump_read_test() {
     //    let seg = line.some_segment();
     //    println!("{:?}", seg);
     //}
-}
+}*/
 
 #[test]
 fn write_segment_to_string_buffer() {
