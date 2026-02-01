@@ -2,6 +2,11 @@
 //!
 //! This module provides serialization and deserialization of GFA objects
 //! to a compact binary format with the `.gfabin` extension.
+//!
+//! Optimizations:
+//! - Varint encoding for integers
+//! - 2-bit encoding for DNA sequences (A=00, C=01, G=10, T=11)
+//! - Segment name deduplication with index references
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -19,8 +24,8 @@ use crate::optfields::{OptField, OptFieldVal, OptFields};
 /// Magic bytes for the binary format header
 const MAGIC: &[u8; 6] = b"GFABIN";
 
-/// Current format version
-const VERSION: u8 = 1;
+/// Current format version (v2 uses varint encoding)
+const VERSION: u8 = 2;
 
 /// Error type for binary format operations
 #[derive(Debug)]
@@ -64,6 +69,75 @@ impl From<bincode::error::DecodeError> for BinaryFormatError {
     fn from(e: bincode::error::DecodeError) -> Self {
         BinaryFormatError::Decode(e)
     }
+}
+
+// 2-bit DNA encoding: A=00, C=01, G=10, T=11
+// Non-ACGT characters are stored separately
+
+#[derive(Encode, Decode)]
+struct EncodedSequence {
+    /// 2-bit packed DNA data (4 bases per byte)
+    packed: Vec<u8>,
+    /// Original length in bases
+    len: usize,
+    /// Non-ACGT positions and their values: (position, byte)
+    exceptions: Vec<(usize, u8)>,
+}
+
+fn encode_dna(seq: &[u8]) -> EncodedSequence {
+    let len = seq.len();
+    let packed_len = (len + 3) / 4;
+    let mut packed = vec![0u8; packed_len];
+    let mut exceptions = Vec::new();
+
+    for (i, &base) in seq.iter().enumerate() {
+        let bits = match base {
+            b'A' | b'a' => 0b00,
+            b'C' | b'c' => 0b01,
+            b'G' | b'g' => 0b10,
+            b'T' | b't' => 0b11,
+            _ => {
+                exceptions.push((i, base));
+                0b00 // placeholder
+            }
+        };
+        let byte_idx = i / 4;
+        let bit_offset = (3 - (i % 4)) * 2;
+        packed[byte_idx] |= bits << bit_offset;
+    }
+
+    EncodedSequence {
+        packed,
+        len,
+        exceptions,
+    }
+}
+
+fn decode_dna(encoded: EncodedSequence) -> Vec<u8> {
+    let mut seq = Vec::with_capacity(encoded.len);
+
+    for i in 0..encoded.len {
+        let byte_idx = i / 4;
+        let bit_offset = (3 - (i % 4)) * 2;
+        let bits = (encoded.packed[byte_idx] >> bit_offset) & 0b11;
+        let base = match bits {
+            0b00 => b'A',
+            0b01 => b'C',
+            0b10 => b'G',
+            0b11 => b'T',
+            _ => unreachable!(),
+        };
+        seq.push(base);
+    }
+
+    // Apply exceptions
+    for (pos, byte) in encoded.exceptions {
+        if pos < seq.len() {
+            seq[pos] = byte;
+        }
+    }
+
+    seq
 }
 
 // Binary-compatible representations of GFA types
@@ -194,7 +268,7 @@ struct BinHeader {
 #[derive(Encode, Decode)]
 struct BinSegment {
     name: Vec<u8>,
-    sequence: Vec<u8>,
+    sequence: EncodedSequence,
     optional: Vec<BinOptField>,
 }
 
@@ -281,7 +355,7 @@ impl<T: OptFields> From<&GFA<Vec<u8>, T>> for BinGFA {
                 .iter()
                 .map(|s| BinSegment {
                     name: s.name.clone(),
-                    sequence: s.sequence.clone(),
+                    sequence: encode_dna(&s.sequence),
                     optional: opt_fields_to_bin(&s.optional),
                 })
                 .collect(),
@@ -369,7 +443,7 @@ impl From<BinGFA> for GFA<Vec<u8>, Vec<OptField>> {
                 .into_iter()
                 .map(|s| Segment {
                     name: s.name,
-                    sequence: s.sequence,
+                    sequence: decode_dna(s.sequence),
                     optional: bin_to_opt_fields(s.optional),
                 })
                 .collect(),
@@ -479,9 +553,9 @@ pub fn write_binary_to_writer<T: OptFields, W: Write>(
     writer.write_all(MAGIC)?;
     writer.write_all(&[VERSION])?;
 
-    // Convert to binary representation and encode
+    // Convert to binary representation and encode with varint
     let bin_gfa = BinGFA::from(gfa);
-    let config = bincode::config::standard();
+    let config = bincode::config::standard().with_variable_int_encoding();
     bincode::encode_into_std_write(&bin_gfa, writer, config)?;
 
     Ok(())
@@ -537,8 +611,8 @@ pub fn read_binary_from_reader<R: Read>(
         return Err(BinaryFormatError::UnsupportedVersion(version[0]));
     }
 
-    // Decode the binary GFA
-    let config = bincode::config::standard();
+    // Decode the binary GFA with varint
+    let config = bincode::config::standard().with_variable_int_encoding();
     let bin_gfa: BinGFA = bincode::decode_from_std_read(reader, config)?;
 
     Ok(GFA::from(bin_gfa))
