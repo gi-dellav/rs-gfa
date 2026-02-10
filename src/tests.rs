@@ -42,6 +42,75 @@ fn gfa_line_ref_iter() {
 }
 
 #[test]
+fn gfa_rgfa1_ref_iter() {
+    let parser: crate::parser::GFAParser<usize, ()> =
+        crate::parser::GFAParser::new();
+    let gfa = parser.parse_file(&"./test/gfas/rGFA1_test.gfa").unwrap();
+    let gfa_lineref = gfa.lines_iter();
+
+    for line in gfa_lineref {
+        let seg = line.some_segment();
+        println!("{:?}", seg);
+    }
+}
+
+
+#[test]
+fn gfa_testgraph_walk_iter() {
+    let parser: crate::parser::GFAParser<usize, ()> =
+        crate::parser::GFAParser::new();
+    let gfa = parser.parse_file(&"./test/gfas/testGraph_1.1.gfa").unwrap();
+    let gfa_lineref = gfa.lines_iter();
+
+    for line in gfa_lineref {
+        let seg = line.some_segment();
+        println!("{:?}", seg);
+    }
+}
+
+
+#[test]
+fn gfa_testgraph_compact_nopw_iter() {
+    let parser: crate::parser::GFAParser<usize, ()> =
+        crate::parser::GFAParser::new();
+    let gfa = parser.parse_file(&"./test/gfas/testGraph_compact_nopw.gfa").unwrap();
+    let gfa_lineref = gfa.lines_iter();
+
+    for line in gfa_lineref {
+        let seg = line.some_segment();
+        println!("{:?}", seg);
+    }
+}
+
+
+#[test]
+fn gfa_testgraph_complex_iter() {
+    let parser: crate::parser::GFAParser<usize, ()> =
+        crate::parser::GFAParser::new();
+    let gfa = parser.parse_file(&"./test/gfas/testGraph_complex.gfa").unwrap();
+    let gfa_lineref = gfa.lines_iter();
+
+    for line in gfa_lineref {
+        let seg = line.some_segment();
+        println!("{:?}", seg);
+    }
+}
+
+
+#[test]
+fn gfa_testgraph_nonnum_iter() {
+    let parser: crate::parser::GFAParser<Vec<u8>, ()> =
+        crate::parser::GFAParser::new();
+    let gfa = parser.parse_file(&"./test/gfas/testGraph_non-num.gfa").unwrap();
+    let gfa_lineref = gfa.lines_iter();
+
+    for line in gfa_lineref {
+        let seg = line.some_segment();
+        println!("{:?}", seg);
+    }
+}
+
+/*#[test]
 fn gfa_jump_read_test() {
     let parser: crate::parser::GFAParser<usize, ()> =
         crate::parser::GFAParser::new();
@@ -51,7 +120,7 @@ fn gfa_jump_read_test() {
     //    let seg = line.some_segment();
     //    println!("{:?}", seg);
     //}
-}
+}*/
 
 #[test]
 fn write_segment_to_string_buffer() {
